@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "test": "bun test",
     "dev:bun": "bun run --hot src/bun.ts",
     "start:bun": "bun run src/bun.ts",
     "dev:worker": "wrangler dev",
