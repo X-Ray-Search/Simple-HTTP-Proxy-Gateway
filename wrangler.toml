@@ -1,0 +1,6 @@
+name = "simple-http-proxy-gateway"
+main = "src/worker.ts"
+compatibility_date = "2024-02-08"
+
+# [vars]
+# PROXY_AUTH_TOKEN = "your-token-here"

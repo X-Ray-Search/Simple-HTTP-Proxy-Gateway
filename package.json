@@ -1,12 +1,17 @@
 {
   "name": "simple-http-proxy-gateway",
-  "module": "index.ts",
+  "version": "1.0.0",
   "type": "module",
-  "private": true,
-  "devDependencies": {
-    "@types/bun": "latest"
+  "scripts": {
+    "dev:bun": "bun run --hot src/bun.ts",
+    "start:bun": "bun run src/bun.ts",
+    "dev:worker": "wrangler dev",
+    "deploy:worker": "wrangler deploy"
   },
-  "peerDependencies": {
-    "typescript": "^5"
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240208.0",
+    "bun-types": "^1.0.0",
+    "typescript": "^5.0.0",
+    "wrangler": "^3.0.0"
   }
 }
