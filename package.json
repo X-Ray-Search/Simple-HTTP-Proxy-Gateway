@@ -4,15 +4,15 @@
   "type": "module",
   "scripts": {
     "test": "bun test",
-    "dev:bun": "bun run --hot src/bun.ts",
-    "start:bun": "bun run src/bun.ts",
+    "dev:bun": "bun run --hot entrypoints/bun.ts",
+    "start:bun": "bun run entrypoints/bun.ts",
     "dev:worker": "wrangler dev",
     "deploy:worker": "wrangler deploy"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20240208.0",
-    "bun-types": "^1.0.0",
-    "typescript": "^5.0.0",
-    "wrangler": "^3.0.0"
+    "@cloudflare/workers-types": "^4.20260430.1",
+    "bun-types": "^1.3.13",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.86.0"
   }
 }
