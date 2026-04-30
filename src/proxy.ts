@@ -1,4 +1,5 @@
 export async function handleRequest(request: Request, env: { PROXY_AUTH_TOKEN?: string }): Promise<Response> {
+  console.log(request.method, request.url);
   const authToken = env.PROXY_AUTH_TOKEN;
   if (!authToken) {
     return new Response("Server configuration error: PROXY_AUTH_TOKEN is not set", { status: 500 });
@@ -32,13 +33,36 @@ export async function handleRequest(request: Request, env: { PROXY_AUTH_TOKEN?: 
     return new Response("Invalid Authentication Format", { status: 400 });
   }
 
-  const url = new URL(request.url);
+  if (request.method === "CONNECT") {
+    return new Response("CONNECT method is not supported", { status: 400 });
+  }
+
+  let targetUrlStr = request.url;
+  let url: URL;
   
-  // If request is made directly to the proxy without a full URL (e.g. gateway mode)
-  // we might need to rely on a query parameter or custom header if it's acting as a fetcher.
-  // Assuming it acts as a forward proxy, `request.url` will be the destination.
+  try {
+    url = new URL(request.url);
+  } catch (e) {
+    return new Response("Invalid URL format", { status: 400 });
+  }
+
+  // Gateway mode support: if the request URL is pointing to the proxy itself,
+  // try to use a "url" query parameter, or extract the path if it's a URL.
+  if (url.searchParams.has("url")) {
+    targetUrlStr = url.searchParams.get("url")!;
+  } else if (url.pathname.startsWith("/http")) {
+    targetUrlStr = url.pathname.slice(1) + url.search;
+  }
   
-  const proxyRequest = new Request(request.url, {
+  // Validate target URL
+  let targetUrl: URL;
+  try {
+    targetUrl = new URL(targetUrlStr);
+  } catch (e) {
+    return new Response("Invalid target URL", { status: 400 });
+  }
+
+  const proxyRequest = new Request(targetUrl.toString(), {
     method: request.method,
     headers: new Headers(request.headers),
     body: request.body,
