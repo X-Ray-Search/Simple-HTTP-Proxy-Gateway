@@ -1,4 +1,4 @@
-import { handleRequest } from "../src/proxy.ts";
+import { handleRequest } from "../proxy.ts";
 
 const port = process.env.PORT || 3000;
 

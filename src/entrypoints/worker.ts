@@ -1,4 +1,4 @@
-import { handleRequest } from "../src/proxy.ts";
+import { handleRequest } from "../proxy.ts";
 
 export interface Env {
   PROXY_AUTH_TOKEN: string;

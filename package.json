@@ -4,8 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "bun test",
-    "dev:bun": "bun run --hot entrypoints/bun.ts",
-    "start:bun": "bun run entrypoints/bun.ts",
+    "dev:bun": "bun run --hot src/entrypoints/bun.ts",
+    "start:bun": "bun run src/entrypoints/bun.ts",
     "dev:worker": "wrangler dev",
     "deploy:worker": "wrangler deploy"
   },

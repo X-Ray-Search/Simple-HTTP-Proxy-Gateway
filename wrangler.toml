@@ -1,5 +1,5 @@
 name = "simple-http-proxy-gateway"
-main = "entrypoints/worker.ts"
+main = "src/entrypoints/worker.ts"
 compatibility_date = "2024-02-08"
 
 # [vars]
