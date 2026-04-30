@@ -1,3 +1,18 @@
+import { z } from "zod";
+
+const FetchConfigSchema = z.object({
+  url: z.string().url("Invalid target URL format"),
+  returnFormat: z.enum(["raw", "json"]).optional().default("raw"),
+  init: z.object({
+    method: z.string().optional().default("GET"),
+    headers: z.record(z.string()).optional().default({}),
+    body: z.string().optional(),
+    bodyEncoding: z.enum(["text", "base64"]).optional().default("text"),
+    redirect: z.enum(["follow", "error", "manual"]).optional().default("manual"),
+    cf: z.any().optional(),
+  }).optional().default({}),
+});
+
 export async function handleRequest(request: Request, env: { PROXY_AUTH_TOKEN?: string }): Promise<Response> {
   console.log(request.method, request.url);
   const authToken = env.PROXY_AUTH_TOKEN;
@@ -47,14 +62,30 @@ export async function handleRequest(request: Request, env: { PROXY_AUTH_TOKEN?: 
   // --- NEW JSON RPC MODE ---
   if (request.method === "POST" && url.pathname === "/v1/fetch") {
     try {
-      const config = await request.json() as any;
-      if (!config.url || typeof config.url !== "string") {
-        return new Response("Missing or invalid 'url' in JSON payload", { status: 400 });
+      const rawJson = await request.json().catch(() => null);
+      if (!rawJson) {
+        return new Response(JSON.stringify({ error: "Invalid or missing JSON payload" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
       }
 
+      const parsed = FetchConfigSchema.safeParse(rawJson);
+      if (!parsed.success) {
+        return new Response(JSON.stringify({ 
+          error: "Validation failed", 
+          issues: parsed.error.issues 
+        }), { 
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      const config = parsed.data;
+
       let fetchBody: BodyInit | null = null;
-      if (config.init?.body) {
-        if (config.init?.bodyEncoding === "base64") {
+      if (config.init.body) {
+        if (config.init.bodyEncoding === "base64") {
           const binaryString = atob(config.init.body);
           const bytes = new Uint8Array(binaryString.length);
           for (let i = 0; i < binaryString.length; i++) {
@@ -67,12 +98,12 @@ export async function handleRequest(request: Request, env: { PROXY_AUTH_TOKEN?: 
       }
 
       const proxyRequest = new Request(config.url, {
-        method: config.init?.method || "GET",
-        headers: config.init?.headers || {},
+        method: config.init.method,
+        headers: config.init.headers,
         body: fetchBody,
-        redirect: config.init?.redirect || "manual",
+        redirect: config.init.redirect,
         // @ts-ignore Cloudflare specific fetch options
-        cf: config.init?.cf,
+        cf: config.init.cf,
       });
 
       const response = await fetch(proxyRequest);
