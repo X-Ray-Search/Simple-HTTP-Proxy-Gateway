@@ -37,15 +37,79 @@ export async function handleRequest(request: Request, env: { PROXY_AUTH_TOKEN?: 
     return new Response("CONNECT method is not supported", { status: 400 });
   }
 
-  let targetUrlStr = request.url;
   let url: URL;
-  
   try {
     url = new URL(request.url);
   } catch (e) {
     return new Response("Invalid URL format", { status: 400 });
   }
 
+  // --- NEW JSON RPC MODE ---
+  if (request.method === "POST" && url.pathname === "/v1/fetch") {
+    try {
+      const config = await request.json() as any;
+      if (!config.url || typeof config.url !== "string") {
+        return new Response("Missing or invalid 'url' in JSON payload", { status: 400 });
+      }
+
+      let fetchBody: BodyInit | null = null;
+      if (config.init?.body) {
+        if (config.init?.bodyEncoding === "base64") {
+          const binaryString = atob(config.init.body);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          fetchBody = bytes.buffer;
+        } else {
+          fetchBody = config.init.body;
+        }
+      }
+
+      const proxyRequest = new Request(config.url, {
+        method: config.init?.method || "GET",
+        headers: config.init?.headers || {},
+        body: fetchBody,
+        redirect: config.init?.redirect || "manual",
+        // @ts-ignore Cloudflare specific fetch options
+        cf: config.init?.cf,
+      });
+
+      const response = await fetch(proxyRequest);
+
+      if (config.returnFormat === "json") {
+        const responseBuffer = await response.arrayBuffer();
+        const base64Body = btoa(String.fromCharCode(...new Uint8Array(responseBuffer)));
+        const headersRecord: Record<string, string> = {};
+        response.headers.forEach((val, key) => { headersRecord[key] = val; });
+
+        return new Response(JSON.stringify({
+          status: response.status,
+          statusText: response.statusText,
+          headers: headersRecord,
+          url: response.url,
+          redirected: response.redirected,
+          bodyBase64: base64Body
+        }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } else {
+        const responseHeaders = new Headers(response.headers);
+        // Leave headers largely transparent, just copy them over
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: responseHeaders,
+        });
+      }
+    } catch (e: any) {
+      return new Response(`Error processing JSON payload: ${e.message}`, { status: 400 });
+    }
+  }
+  // --- END JSON RPC MODE ---
+
+  let targetUrlStr = request.url;
+  
   // Gateway mode support: if the request URL is pointing to the proxy itself,
   // try to use a "url" query parameter, or extract the path if it's a URL.
   if (url.searchParams.has("url")) {

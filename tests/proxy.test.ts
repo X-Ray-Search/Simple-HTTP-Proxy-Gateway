@@ -13,6 +13,11 @@ describe("HTTP Proxy Gateway", () => {
         if (req.url.endsWith("/hello")) {
           return new Response("world", { status: 200, headers: { "X-Test-Header": "success" } });
         }
+        if (req.url.endsWith("/echo-post")) {
+          return new Response(req.body, {
+            headers: { "Content-Type": "application/json", "X-Target-Method": req.method }
+          });
+        }
         return new Response("Not found", { status: 404 });
       },
     });
@@ -95,18 +100,73 @@ describe("HTTP Proxy Gateway", () => {
     expect(res.headers.get("X-Test-Header")).toBe("success");
   });
 
-  it("should successfully proxy the request with valid Authorization header (fallback)", async () => {
+  it("should return 400 for CONNECT requests", async () => {
     const validAuth = btoa("x-ray:secret");
     const req = new Request(`${targetUrl}/hello`, {
-      method: "GET",
-      headers: { 
-        "Authorization": `Basic ${validAuth}`
-      }
+      method: "CONNECT",
+      headers: { "Authorization": `Basic ${validAuth}` }
     });
     
     const res = await handleRequest(req, { PROXY_AUTH_TOKEN: "secret" });
     
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("CONNECT method is not supported");
+  });
+
+  it("should process JSON RPC fetch configs returning raw response", async () => {
+    const validAuth = btoa("x-ray:secret");
+    const config = {
+      url: `${targetUrl}/echo-post`,
+      init: {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ping: "pong" })
+      }
+    };
+    
+    const req = new Request(`http://proxy.local/v1/fetch`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Basic ${validAuth}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(config)
+    });
+
+    const res = await handleRequest(req, { PROXY_AUTH_TOKEN: "secret" });
     expect(res.status).toBe(200);
-    expect(await res.text()).toBe("world");
+    expect(res.headers.get("X-Target-Method")).toBe("POST");
+    expect(await res.json()).toEqual({ ping: "pong" });
+  });
+
+  it("should process JSON RPC fetch configs returning JSON response format", async () => {
+    const validAuth = btoa("x-ray:secret");
+    const config = {
+      url: `${targetUrl}/echo-post`,
+      returnFormat: "json",
+      init: {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ping: "pong" })
+      }
+    };
+    
+    const req = new Request(`http://proxy.local/v1/fetch`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Basic ${validAuth}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(config)
+    });
+
+    const res = await handleRequest(req, { PROXY_AUTH_TOKEN: "secret" });
+    expect(res.status).toBe(200);
+    const jsonResponse = await res.json();
+    expect(jsonResponse.status).toBe(200);
+    expect(jsonResponse.headers["x-target-method"]).toBe("POST");
+    // Decode base64 body
+    const decodedBody = atob(jsonResponse.bodyBase64);
+    expect(JSON.parse(decodedBody)).toEqual({ ping: "pong" });
   });
 });
